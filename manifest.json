@@ -4,7 +4,7 @@
   "name": "YouTube Player",
   "version": "0.1.0",
   "author": "Cristian Aravena",
-  "description": "A compact YouTube player for Omarchy with background playback and search",
+  "description": "Search and play public YouTube videos from an anchored top-right popup with PiP and audio-only mode",
   "kinds": ["bar-widget"],
   "entryPoints": {
     "barWidget": "Widget.qml"

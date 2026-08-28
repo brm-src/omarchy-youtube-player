@@ -107,6 +107,39 @@ def normalize_window(restore_address: str = "") -> None:
         dispatch(f'''hl.dsp.focus({{ window = "address:{restore_address}" }})''')
 
 
+def move_player_to_workspace(workspace: str) -> None:
+    if not workspace:
+        return
+    try:
+        clients = json.loads(subprocess.check_output(["hyprctl", "clients", "-j"], text=True))
+        active_address = active_window_address()
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+        return
+    player = next((item for item in clients if item.get("title") == "Omarchy YouTube"), None)
+    if not player or not player.get("address"):
+        return
+    address = player["address"]
+
+    def dispatch(expression: str) -> None:
+        subprocess.run(["hyprctl", "dispatch", expression], capture_output=True, check=False)
+
+    if address != active_address:
+        dispatch(f'''hl.dsp.focus({{ window = "address:{address}" }})''')
+    dispatch(f'''hl.dsp.window.move({{ workspace = "{workspace}", follow = false }})''')
+    if active_address and active_address != address:
+        dispatch(f'''hl.dsp.focus({{ window = "address:{active_address}" }})''')
+
+
+def player_workspace() -> str:
+    try:
+        clients = json.loads(subprocess.check_output(["hyprctl", "clients", "-j"], text=True))
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+        return ""
+    player = next((item for item in clients if item.get("title") == "Omarchy YouTube"), None)
+    workspace = player.get("workspace") if player else None
+    return str(workspace.get("name") or "") if isinstance(workspace, dict) else ""
+
+
 def ensure_player() -> None:
     restore_address = active_window_address()
     if socket_is_alive():
@@ -237,6 +270,7 @@ def play(url: str, lang: str) -> dict:
     if not valid_video_url(url):
         return {"ok": False, "message": _t("La URL no parece ser de YouTube.", "That URL does not look like YouTube.", lang)}
     restore_address = active_window_address()
+    previous_state = read_state()
     try:
         data = metadata_for(url)
         title = str(data.get("title") or "YouTube video")[:180]
@@ -244,8 +278,11 @@ def play(url: str, lang: str) -> dict:
         thumbnail = data.get("thumbnail") or ""
         ipc(["loadfile", url, "replace"])
         ipc(["set_property", "pause", False])
+        if previous_state.get("audioOnly"):
+            ipc(["set_property", "vid", "auto"])
+            move_player_to_workspace(previous_state.get("workspace", ""))
         normalize_window(restore_address)
-        write_state({"url": url, "title": title, "channel": channel, "thumbnail": thumbnail})
+        write_state({"url": url, "title": title, "channel": channel, "thumbnail": thumbnail, "audioOnly": False})
         return {"ok": True, "title": title, "channel": channel, "thumbnail": thumbnail, "url": url}
     except (OSError, RuntimeError, subprocess.SubprocessError, json.JSONDecodeError) as error:
         return {"ok": False, "message": _t("No se pudo reproducir este video.", "This video could not be played.", lang), "detail": str(error)[:180]}
@@ -269,10 +306,26 @@ def action(name: str, lang: str) -> dict:
         elif name == "fullscreen":
             ipc(["cycle", "fullscreen"])
         elif name == "show":
-            try:
-                ipc(["set_property", "window-minimized", False])
-            except RuntimeError:
-                pass
+            ipc(["set_property", "window-minimized", False])
+            normalize_window(active_window_address())
+        elif name == "audio-only":
+            state = read_state()
+            workspace = player_workspace()
+            if workspace and not workspace.startswith("special:"):
+                state["workspace"] = workspace
+            ipc(["set_property", "vid", "no"])
+            ipc(["set_property", "window-minimized", True])
+            move_player_to_workspace("special:youtube-audio")
+            state["audioOnly"] = True
+            write_state(state)
+        elif name == "show-video":
+            state = read_state()
+            ipc(["set_property", "vid", "auto"])
+            ipc(["set_property", "window-minimized", False])
+            move_player_to_workspace(state.get("workspace", ""))
+            normalize_window(active_window_address())
+            state["audioOnly"] = False
+            write_state(state)
         elif name == "quit":
             ipc(["quit"])
             write_state({})
@@ -301,6 +354,7 @@ def status() -> dict:
         "position": get_property("time-pos") or 0,
         "durationSeconds": get_property("duration") or 0,
         "fullscreen": bool(get_property("fullscreen")),
+        "audioOnly": bool(state.get("audioOnly")) or get_property("vid") == "no",
     }
 
 

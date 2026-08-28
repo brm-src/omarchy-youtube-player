@@ -24,6 +24,7 @@ BarWidget {
   property string currentUrl: ""
   property bool playing: false
   property bool active: false
+  property bool audioOnly: false
   property real position: 0
   property real durationSeconds: 0
   property var results: []
@@ -81,6 +82,7 @@ BarWidget {
           currentUrl = data.url || currentUrl
           position = Number(data.position || 0)
           durationSeconds = Number(data.durationSeconds || 0)
+          audioOnly = !!data.audioOnly
         }
       }
     } catch (error) {
@@ -96,7 +98,7 @@ BarWidget {
   }
   function shortTitle(value) {
     var text = String(value || "")
-    return text.length > 58 ? text.slice(0, 57) + "…" : text
+    return text.length > 38 ? text.slice(0, 37) + "…" : text
   }
   function toggle() { popupOpen = !popupOpen; if (popupOpen) { refreshStatus(); Qt.callLater(function() { searchField.forceActiveFocus() }) } }
   function open() { popupOpen = true; refreshStatus(); Qt.callLater(function() { searchField.forceActiveFocus() }) }
@@ -169,13 +171,13 @@ BarWidget {
     }
   }
 
-  KeyboardPanel {
+  PopupCard {
     id: popup
     anchorItem: button
     bar: root.bar
     owner: root
     open: root.popupOpen
-    focusTarget: searchField
+    triggerMode: "hover"
     contentWidth: popup.fittedContentWidth(Style.space(420))
     contentHeight: popup.fittedContentHeight(column.implicitHeight)
 
@@ -285,6 +287,11 @@ BarWidget {
           Button { focusable: true; text: "+"; onClicked: root.run(["action", "volume-up"]) }
           Button { focusable: true; text: root.words("Ampliar", "Fullscreen"); onClicked: root.run(["action", "fullscreen"]) }
           Button { focusable: true; text: root.words("Detener", "Stop"); onClicked: root.run(["action", "stop"]) }
+        }
+        Row {
+          width: parent.width
+          spacing: Style.space(6)
+          Button { focusable: true; text: root.audioOnly ? root.words("Mostrar video", "Show video") : root.words("Solo audio", "Audio only"); onClicked: root.run(["action", root.audioOnly ? "show-video" : "audio-only"]) }
         }
         Row {
           width: parent.width

@@ -4,6 +4,7 @@ A compact YouTube player for the Omarchy bar.
 
 ![YouTube Player search panel](screenshots/search.png)
 ![YouTube Player PiP window](screenshots/player.png)
+![YouTube Player audio-only mode](screenshots/audio-only.png)
 
 ## What it does
 
@@ -58,11 +59,12 @@ Omit that environment variable to use the system language.
 
 ## Use
 
-- Click the bar icon to open the player.
+- Click the bar icon in the top-right bar to open the anchored player popup.
 - Search for a video, then select a result.
-- The video opens in a small native `mpv` window and continues playing after the popup closes.
-- Use the popup controls for pause, seek, volume, stop, and fullscreen.
-- Close the `mpv` window normally, or use Stop before quitting the shell.
+- Playback continues in the background in a small PiP window without capturing the mouse or keyboard focus.
+- Use the popup controls for pause, seek, volume, fullscreen, and `Audio only`.
+- `Audio only` disables the video track and minimizes the PiP window while audio continues.
+- Use `Show video` to restore the PiP window, or `Stop` to end playback.
 
 The direct IPC target is:
 
@@ -71,6 +73,16 @@ omarchy-shell io.github.brm-src.omarchy-youtube-player open
 omarchy-shell io.github.brm-src.omarchy-youtube-player close
 omarchy-shell io.github.brm-src.omarchy-youtube-player toggle
 ```
+
+## Remove
+
+```bash
+python3 ~/.config/omarchy/plugins/io.github.brm-src.omarchy-youtube-player/player.py action quit --lang en
+omarchy plugin remove io.github.brm-src.omarchy-youtube-player --yes
+omarchy restart shell
+```
+
+The command disables the plugin, removes it from the Omarchy plugin registry, and deletes the installed plugin files. Playback state is stored separately under `$XDG_STATE_HOME/omarchy-youtube-player`; remove that directory only if you also want to delete the local last-video metadata.
 
 ## Privacy and scope
 
