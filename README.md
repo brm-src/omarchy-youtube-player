@@ -62,6 +62,7 @@ Omit that environment variable to use the system language.
 - Click the bar icon in the top-right bar to open the anchored player popup.
 - Search for a video, then select a result.
 - Playback continues in the background in a small PiP window without capturing the mouse or keyboard focus.
+- Press `Escape` or click outside the popup to close it.
 - Use the popup controls for pause, seek, volume, fullscreen, and `Audio only`.
 - `Audio only` disables the video track and minimizes the PiP window while audio continues.
 - Use `Show video` to restore the PiP window, or `Stop` to end playback.

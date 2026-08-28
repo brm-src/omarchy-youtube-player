@@ -171,14 +171,13 @@ BarWidget {
     }
   }
 
-  PopupCard {
+  KeyboardPanel {
     id: popup
     anchorItem: button
     bar: root.bar
     owner: root
     open: root.popupOpen
-    triggerMode: "hover"
-    grabFocus: root.popupOpen
+    focusTarget: searchField
     contentWidth: popup.fittedContentWidth(Style.space(420))
     contentHeight: popup.fittedContentHeight(column.implicitHeight)
 
@@ -227,6 +226,10 @@ BarWidget {
           placeholderText: root.words("Buscar en YouTube", "Search YouTube")
           foreground: root.foreground
           font.family: Style.font.menuFamily
+          Keys.onEscapePressed: function(event) {
+            root.close()
+            event.accepted = true
+          }
           onAccepted: root.search()
         }
         Button {
