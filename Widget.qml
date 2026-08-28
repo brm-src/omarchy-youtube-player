@@ -28,6 +28,7 @@ BarWidget {
   property real position: 0
   property real durationSeconds: 0
   property var results: []
+  readonly property int maxJsonChars: 262144
 
   function words(es, en) { return isSpanish ? es : en }
   function run(args) {
@@ -54,7 +55,12 @@ BarWidget {
     statusProcess.running = true
   }
   function handleJson(raw, kind) {
-    var text = raw.trim()
+    var text = String(raw || "").trim()
+    if (text.length > maxJsonChars) {
+      busy = false
+      statusMessage = words("Respuesta demasiado grande.", "Response too large.")
+      return
+    }
     if (!text) return
     try {
       var data = JSON.parse(text)
@@ -64,7 +70,20 @@ BarWidget {
           results = []
           statusMessage = data.message || words("La búsqueda falló.", "Search failed.")
         } else {
-          results = data.results || []
+          var boundedResults = []
+          var sourceResults = Array.isArray(data.results) ? data.results : []
+          for (var index = 0; index < Math.min(sourceResults.length, 8); index += 1) {
+            var item = sourceResults[index] || {}
+            boundedResults.push({
+              id: String(item.id || "").slice(0, 64),
+              title: String(item.title || "Untitled").slice(0, 180),
+              channel: String(item.channel || "").slice(0, 100),
+              duration: String(item.duration || "").slice(0, 16),
+              url: String(item.url || "").slice(0, 2048),
+              thumbnail: String(item.thumbnail || "").slice(0, 512)
+            })
+          }
+          results = boundedResults
           statusMessage = results.length ? "" : words("Sin resultados.", "No results.")
         }
       } else if (kind === "action") {
@@ -77,9 +96,9 @@ BarWidget {
         if (data.ok) {
           active = !!data.active
           playing = !!data.playing
-          title = data.title || ""
-          channel = data.channel || ""
-          currentUrl = data.url || currentUrl
+          title = String(data.title || "").slice(0, 180)
+          channel = String(data.channel || "").slice(0, 100)
+          currentUrl = String(data.url || currentUrl).slice(0, 2048)
           position = Number(data.position || 0)
           durationSeconds = Number(data.durationSeconds || 0)
           audioOnly = !!data.audioOnly
@@ -137,9 +156,8 @@ BarWidget {
 
   Process {
     id: searchProcess
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.handleJson(text, "search")
+    stdout: SplitParser {
+      onRead: function(line) { root.handleJson(line, "search") }
     }
     onExited: function(exitCode) {
       if (exitCode !== 0 && root.busy) {
@@ -151,9 +169,8 @@ BarWidget {
 
   Process {
     id: actionProcess
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.handleJson(text, "action")
+    stdout: SplitParser {
+      onRead: function(line) { root.handleJson(line, "action") }
     }
     onExited: function(exitCode) {
       if (exitCode !== 0 && root.busy) {
@@ -165,9 +182,8 @@ BarWidget {
 
   Process {
     id: statusProcess
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.handleJson(text, "status")
+    stdout: SplitParser {
+      onRead: function(line) { root.handleJson(line, "status") }
     }
   }
 
@@ -193,6 +209,7 @@ BarWidget {
           width: parent.width - closeButton.width - Style.space(8)
           spacing: Style.space(3)
           Text {
+    textFormat: Text.PlainText
             text: "YOUTUBE"
             color: root.foreground
             font.family: Style.font.menuFamily
@@ -201,6 +218,7 @@ BarWidget {
             font.letterSpacing: 1.2
           }
           Text {
+    textFormat: Text.PlainText
             width: parent.width
             text: root.words("Reproducción en segundo plano.", "Background playback.")
             color: root.dim
@@ -242,6 +260,7 @@ BarWidget {
       }
 
       Text {
+    textFormat: Text.PlainText
         visible: root.statusMessage !== ""
         width: parent.width
         text: root.statusMessage
@@ -256,6 +275,7 @@ BarWidget {
         width: parent.width
         spacing: Style.space(8)
         Text {
+    textFormat: Text.PlainText
           text: root.words("AHORA REPRODUCIENDO", "NOW PLAYING")
           color: root.dim
           font.family: Style.font.menuFamily
@@ -264,6 +284,7 @@ BarWidget {
           font.letterSpacing: 1
         }
         Text {
+    textFormat: Text.PlainText
           width: parent.width
           text: root.title
           color: root.foreground
@@ -273,6 +294,7 @@ BarWidget {
           elide: Text.ElideRight
         }
         Text {
+    textFormat: Text.PlainText
           width: parent.width
           text: root.channel
           visible: text !== ""
@@ -314,6 +336,7 @@ BarWidget {
             }
           }
           Text {
+    textFormat: Text.PlainText
             id: timeLabel
             text: root.formatTime(root.position) + " / " + root.formatTime(root.durationSeconds)
             color: root.dim
@@ -326,6 +349,7 @@ BarWidget {
       PanelSeparator { visible: root.active && root.results.length > 0; foreground: root.foreground }
 
       Text {
+    textFormat: Text.PlainText
         visible: root.results.length > 0
         text: root.words("RESULTADOS", "SEARCH RESULTS")
         color: root.dim
@@ -374,6 +398,7 @@ BarWidget {
       }
 
       Text {
+    textFormat: Text.PlainText
         visible: !root.active && root.results.length === 0 && root.statusMessage === ""
         width: parent.width
         text: root.words("Busca un video público para comenzar.", "Search for a public video to begin.")

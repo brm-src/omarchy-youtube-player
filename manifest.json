@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.brm-src.omarchy-youtube-player",
   "name": "YouTube Player",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": "Cristian Aravena",
   "description": "Search and play public YouTube videos from an anchored top-right popup with PiP and audio-only mode",
   "kinds": ["bar-widget"],

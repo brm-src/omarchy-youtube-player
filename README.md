@@ -22,7 +22,7 @@ YouTube Player keeps public YouTube playback close to the desktop without turnin
 - toggle fullscreen from the popup when a larger view is wanted;
 - use the system language for user-facing copy: English or Spanish.
 
-The current release is intentionally URL-first and unauthenticated. It saves only the last public video metadata locally. It does not read browser cookies, request Google OAuth, download videos, proxy YouTube, or ship an ad blocker.
+The current release is intentionally URL-first and unauthenticated. It saves only the last public video metadata locally. State files are owner-checked, private, size-limited, and atomically replaced. Process and IPC responses are incrementally bounded before they reach the shell UI. It does not read browser cookies, request Google OAuth, download videos, proxy YouTube, or ship an ad blocker.
 
 Direct stream resolution is not a guarantee of ad-free playback. YouTube playback, availability, authentication, and advertising behavior remain controlled by YouTube. When direct playback fails, open the canonical URL in a normal browser.
 
