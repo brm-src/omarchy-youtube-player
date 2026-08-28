@@ -2,6 +2,10 @@
 
 A compact YouTube player for the Omarchy bar.
 
+![YouTube Player for Omarchy](screenshots/hero.png)
+
+## Screenshots
+
 ![YouTube Player search panel](screenshots/search.png)
 ![YouTube Player PiP window](screenshots/player.png)
 ![YouTube Player audio-only mode](screenshots/audio-only.png)
