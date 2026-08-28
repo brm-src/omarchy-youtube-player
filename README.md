@@ -1,6 +1,6 @@
 # YouTube Player for Omarchy
 
-A compact YouTube player for the Omarchy bar.
+A bar-native YouTube player for Omarchy: search public videos, keep audio in the background, and reveal PiP on demand.
 
 ![YouTube Player for Omarchy](screenshots/hero.png)
 
