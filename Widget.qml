@@ -178,6 +178,7 @@ BarWidget {
     owner: root
     open: root.popupOpen
     triggerMode: "hover"
+    grabFocus: root.popupOpen
     contentWidth: popup.fittedContentWidth(Style.space(420))
     contentHeight: popup.fittedContentHeight(column.implicitHeight)
 
