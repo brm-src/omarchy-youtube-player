@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.brm-src.omarchy-youtube-player",
+  "name": "YouTube Player",
+  "version": "0.1.0",
+  "author": "Cristian Aravena",
+  "description": "A compact YouTube player for Omarchy with background playback and search",
+  "kinds": ["bar-widget"],
+  "entryPoints": {
+    "barWidget": "Widget.qml"
+  },
+  "barWidget": {
+    "displayName": "YouTube Player",
+    "description": "Search and play public YouTube videos from the Omarchy bar",
+    "category": "Media",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
