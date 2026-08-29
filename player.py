@@ -300,7 +300,6 @@ def player_workspace() -> str:
 def ensure_player() -> None:
     restore_address = active_window_address()
     if socket_is_alive():
-        normalize_window(restore_address)
         return
     try:
         SOCKET_PATH.unlink()
