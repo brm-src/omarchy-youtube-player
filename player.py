@@ -31,7 +31,6 @@ MAX_URL_CHARS = 2048
 MAX_THUMBNAIL_CHARS = 512
 MAX_TITLE_CHARS = 180
 MAX_CHANNEL_CHARS = 100
-MAX_WORKSPACE_CHARS = 64
 MAX_RESULTS = 8
 
 
@@ -96,7 +95,6 @@ def _state_data(data: object) -> dict:
         "channel": _bounded_text(data.get("channel"), MAX_CHANNEL_CHARS),
         "thumbnail": _safe_http_url(data.get("thumbnail"), MAX_THUMBNAIL_CHARS),
         "audioOnly": bool(data.get("audioOnly")),
-        "workspace": _bounded_text(data.get("workspace"), MAX_WORKSPACE_CHARS),
     }
 
 
@@ -225,101 +223,34 @@ def _run_bounded_text(command: list[str], timeout: float = 4.0) -> tuple[int, st
     return code, stdout.decode("utf-8", errors="replace"), stderr.decode("utf-8", errors="replace")
 
 
-def _hyprctl_json(arguments: list[str]) -> dict | list:
-    try:
-        code, stdout, _ = _run_bounded_text(["hyprctl", *arguments])
-        data = json.loads(stdout)
-        return data if code == 0 and isinstance(data, (dict, list)) else {}
-    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
-        return {}
-
-
-def active_window_address() -> str:
-    active = _hyprctl_json(["activewindow", "-j"])
-    return _bounded_text(active.get("address"), MAX_WORKSPACE_CHARS) if isinstance(active, dict) else ""
-
-
-def normalize_window(restore_address: str = "") -> None:
-    """Keep the player as PiP without leaving focus on it."""
-    clients = _hyprctl_json(["clients", "-j"])
-    if not isinstance(clients, list):
-        return
-    player = next((item for item in clients if isinstance(item, dict) and item.get("title") == "Omarchy YouTube"), None)
-    if not player:
-        return
-    address = _bounded_text(player.get("address"), MAX_WORKSPACE_CHARS)
-    active_address = active_window_address()
-    size = player.get("size") or [480, 270]
-
-    def dispatch(expression: str) -> None:
-        subprocess.run(["hyprctl", "dispatch", expression], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=4, check=False)
-
-    if address and address != active_address:
-        dispatch(f'''hl.dsp.focus({{ window = "address:{address}" }})''')
-    width_delta = 480 - int(size[0])
-    height_delta = 270 - int(size[1])
-    if width_delta or height_delta:
-        dispatch(f"hl.dsp.window.resize({{ x = {width_delta}, y = {height_delta}, relative = true }})")
-    dispatch("hl.dsp.window.move({ x = 24, y = 64, relative = false })")
-    if restore_address and restore_address != address:
-        dispatch(f'''hl.dsp.focus({{ window = "address:{restore_address}" }})''')
-
-
-def move_player_to_workspace(workspace: str) -> None:
-    workspace = _bounded_text(workspace, MAX_WORKSPACE_CHARS)
-    if not workspace:
-        return
-    clients = _hyprctl_json(["clients", "-j"])
-    if not isinstance(clients, list):
-        return
-    active_address = active_window_address()
-    player = next((item for item in clients if isinstance(item, dict) and item.get("title") == "Omarchy YouTube"), None)
-    if not player or not player.get("address"):
-        return
-    address = _bounded_text(player["address"], MAX_WORKSPACE_CHARS)
-
-    def dispatch(expression: str) -> None:
-        subprocess.run(["hyprctl", "dispatch", expression], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=4, check=False)
-
-    if address != active_address:
-        dispatch(f'''hl.dsp.focus({{ window = "address:{address}" }})''')
-    dispatch(f'''hl.dsp.window.move({{ workspace = "{workspace}", follow = false }})''')
-    if active_address and active_address != address:
-        dispatch(f'''hl.dsp.focus({{ window = "address:{active_address}" }})''')
-
-
-def player_workspace() -> str:
-    clients = _hyprctl_json(["clients", "-j"])
-    if not isinstance(clients, list):
-        return ""
-    player = next((item for item in clients if isinstance(item, dict) and item.get("title") == "Omarchy YouTube"), None)
-    workspace = player.get("workspace") if player else None
-    return _bounded_text(workspace.get("name"), MAX_WORKSPACE_CHARS) if isinstance(workspace, dict) else ""
+# Hyprland places the PiP itself, so the helper never focuses or moves windows.
+WINDOW_RULE = (
+    "if omarchy_youtube_rule then omarchy_youtube_rule:set_enabled(false) end; "
+    "omarchy_youtube_rule = hl.window_rule({ match = { class = \"^omarchy-youtube$\" }, "
+    "float = true, pin = true, no_initial_focus = true, size = { 480, 270 }, move = { 24, 64 } })"
+)
 
 
 def ensure_player() -> None:
-    restore_address = active_window_address()
     if socket_is_alive():
-        normalize_window(restore_address)
         return
     try:
         SOCKET_PATH.unlink()
     except FileNotFoundError:
         pass
     SOCKET_PATH.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["hyprctl", "eval", WINDOW_RULE], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=4, check=False)
     command = [
         "mpv",
         "--no-terminal",
-        "--force-window=immediate",
-        "--focus-on=never",
-        "--force-window-position",
-        "--ontop-level=system",
-        "--player-operation-mode=pseudo-gui",
+        "--vid=no",
+        "--force-window=no",
+        "--wayland-app-id=omarchy-youtube",
         "--title=Omarchy YouTube",
         "--input-ipc-server=" + str(SOCKET_PATH),
-        "--geometry=480x270+24+64",
-        "--autofit=480x270",
         "--ytdl-format=bestvideo[height<=720]+bestaudio/best[height<=720]",
+        # YouTube stream URLs answer 403 until their available_at time; retry instead of failing.
+        "--stream-lavf-o=reconnect=1,reconnect_on_http_error=4xx,reconnect_delay_max=10",
         "--idle=yes",
         "--keep-open=yes",
     ]
@@ -327,14 +258,12 @@ def ensure_player() -> None:
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
         if socket_is_alive():
-            normalize_window(restore_address)
             return
         time.sleep(0.05)
     raise RuntimeError("mpv did not open its IPC socket")
 
 
 def ipc(command: list[object], request_id: int = 1) -> object:
-    ensure_player()
     payload = (json.dumps({"command": command, "request_id": request_id}) + "\n").encode("utf-8")
     if len(payload) > MAX_SOCKET_BYTES:
         raise ResponseLimitError("IPC request exceeds its size limit")
@@ -447,20 +376,17 @@ def search(query: str, lang: str) -> dict:
 def play(url: str, lang: str) -> dict:
     if not valid_video_url(url):
         return {"ok": False, "message": _t("La URL no parece ser de YouTube.", "That URL does not look like YouTube.", lang)}
-    restore_address = active_window_address()
-    previous_state = read_state()
     try:
         data = metadata_for(url)
         title = _bounded_text(data.get("title"), MAX_TITLE_CHARS) or "YouTube video"
         channel = _bounded_text(data.get("channel") or data.get("uploader"), MAX_CHANNEL_CHARS)
         thumbnail = _safe_http_url(data.get("thumbnail"), MAX_THUMBNAIL_CHARS)
+        ensure_player()
+        # Background playback by default; the PiP only appears on "show-video".
+        ipc(["set_property", "vid", "no"])
         ipc(["loadfile", url, "replace"])
         ipc(["set_property", "pause", False])
-        if previous_state.get("audioOnly"):
-            ipc(["set_property", "vid", "auto"])
-            move_player_to_workspace(previous_state.get("workspace", ""))
-        normalize_window(restore_address)
-        write_state({"url": url, "title": title, "channel": channel, "thumbnail": thumbnail, "audioOnly": False})
+        write_state({"url": url, "title": title, "channel": channel, "thumbnail": thumbnail, "audioOnly": True})
         return {"ok": True, "title": title, "channel": channel, "thumbnail": thumbnail, "url": url}
     except (OSError, RuntimeError, subprocess.SubprocessError, json.JSONDecodeError) as error:
         return {"ok": False, "message": _t("No se pudo reproducir este video.", "This video could not be played.", lang), "detail": str(error)[:180]}
@@ -483,27 +409,10 @@ def action(name: str, lang: str) -> dict:
             ipc(["add", "volume", -5])
         elif name == "fullscreen":
             ipc(["cycle", "fullscreen"])
-        elif name == "show":
-            ipc(["set_property", "window-minimized", False])
-            normalize_window(active_window_address())
-        elif name == "audio-only":
-            state = read_state()
-            workspace = player_workspace()
-            if workspace and not workspace.startswith("special:"):
-                state["workspace"] = workspace
-            ipc(["set_property", "vid", "no"])
-            ipc(["set_property", "window-minimized", True])
-            move_player_to_workspace("special:youtube-audio")
-            state["audioOnly"] = True
-            write_state(state)
-        elif name == "show-video":
-            state = read_state()
-            ipc(["set_property", "vid", "auto"])
-            ipc(["set_property", "window-minimized", False])
-            move_player_to_workspace(state.get("workspace", ""))
-            normalize_window(active_window_address())
-            state["audioOnly"] = False
-            write_state(state)
+        elif name in {"audio-only", "show-video"}:
+            audio_only = name == "audio-only"
+            ipc(["set_property", "vid", "no" if audio_only else "auto"])
+            write_state({**read_state(), "audioOnly": audio_only})
         elif name == "quit":
             ipc(["quit"])
             write_state({})
@@ -532,7 +441,7 @@ def status() -> dict:
         "position": _bounded_number(get_property("time-pos")),
         "durationSeconds": _bounded_number(get_property("duration")),
         "fullscreen": bool(get_property("fullscreen")),
-        "audioOnly": bool(state.get("audioOnly")) or get_property("vid") == "no",
+        "audioOnly": get_property("vid") in {"no", False},
     }
 
 

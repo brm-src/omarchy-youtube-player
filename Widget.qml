@@ -195,6 +195,15 @@ BarWidget {
     focusTarget: searchField
     contentWidth: popup.fittedContentWidth(Style.space(420))
     contentHeight: popup.fittedContentHeight(column.implicitHeight)
+    // Keep the keyboard layer's input region on the card. The shared
+    // KeyboardPanel is full-screen so keyboard-summoned panels can focus, but
+    // this player must not intercept clicks on the desktop around it.
+    mask: Region {
+      x: popup.cardOrigin.x
+      y: popup.cardOrigin.y
+      width: popup.contentWidth
+      height: popup.contentHeight
+    }
 
     Column {
       id: column

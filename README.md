@@ -65,11 +65,11 @@ Omit that environment variable to use the system language.
 
 - Click the bar icon in the top-right bar to open the anchored player popup.
 - Search for a video, then select a result.
-- Playback continues in the background in a small PiP window without capturing the mouse or keyboard focus.
+- Playback starts audio-only in the background; no window opens.
 - Press `Escape` or click outside the popup to close it.
 - Use the popup controls for pause, seek, volume, fullscreen, and `Audio only`.
-- `Audio only` disables the video track and minimizes the PiP window while audio continues.
-- Use `Show video` to restore the PiP window, or `Stop` to end playback.
+- `Show video` opens a pinned 480x270 PiP window placed by a Hyprland window rule, without taking focus.
+- `Audio only` closes the PiP window while audio continues. `Stop` ends playback.
 
 The direct IPC target is:
 
